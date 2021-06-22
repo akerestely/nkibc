@@ -1,6 +1,7 @@
 #%%
 import pandas as pd
 import numpy as np
+from yellowbrick.target import ClassBalance
 
 #%%
 names = ["radius","texture","perimeter","area","smoothness","compactness","concavity","concave points","symmetry","fractal dimension"]
@@ -11,10 +12,26 @@ names
 
 #%%
 df = pd.read_csv(r"data\wdbc.data", names=names)
+df["class"] = df["class"].map({'B':'Benign', 'M':'Malign'})
 df
 
 #%%
 np.unique(df["class"].values, return_counts=True)
+
+# %%
+import seaborn as sns
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(5,4))
+
+sns.countplot(df["class"], ax=ax)
+fig.savefig("wdbcClassBalance.pdf")
+
+# %%
+class_labels = ["Manign", "Benign"]
+
+visualizer = ClassBalance(labels = class_labels)
+visualizer.fit(df["class"])
+visualizer.finalize()
 
 #%%
 #X = df[["texture mean", "concave points mean", "radius worst", "smoothness worst"]]

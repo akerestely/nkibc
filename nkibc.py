@@ -1,6 +1,17 @@
 #%%
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+FONT_SIZE=12
+plt.rcParams.update({'font.size': FONT_SIZE})
+plt.rc('axes', titlesize=FONT_SIZE, labelsize=FONT_SIZE)
+plt.rc('xtick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=FONT_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=FONT_SIZE)  # fontsize of the figure title
+
 
 #%%
 df = pd.read_csv("data/deviramanan2016-nki-breast-cancer-data/NKI_cleaned.csv")
@@ -16,49 +27,77 @@ print(df.columns)
 df.info()
 
 # %%
-X = df.drop(["Patient", "ID", "eventdeath"], axis=1)
+X = df.drop(["Patient", "ID", "barcode", "eventdeath"], axis=1)
 y = df['eventdeath']
 
 display(X.shape)
 display(y.shape)
 
 #%%
-import matplotlib.pyplot as plt
 from yellowbrick.target import ClassBalance
 
-_, y_counts = np.unique(y, return_counts=True)
 class_labels = ["survived", "deceased"]
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,4.5))
-ax1.pie(y_counts, explode=(0, 0.05), labels = class_labels)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5, 3.6))
+y_count = y.map({0:"survived", 1:"deceased"}).value_counts()
+_, _, autotexts = ax1.pie(y_count, labels=y_count.index,  explode=[0.03]*y_count.shape[0], startangle=140, labeldistance = 1.3, autopct=lambda x: f"{x:.1f}% ({int(round(y_count.sum()*x/100))})")
+for autotext in autotexts:
+    autotext.set_color('white')
+    autotext.set_fontweight('semibold')
+ax1.yaxis.label.set_visible(False)
 
 visualizer = ClassBalance(labels = class_labels, ax = ax2)
 visualizer.fit(y)
 visualizer.finalize()
-
-plt.show()
+ax2.yaxis.label.set_visible(False)
+ax2.title.set_visible(False)
+fig.tight_layout()
+fig.savefig("nkiClassDist.pdf")
 
 #%%
 print("Number of missing values:", X.isna().sum().sum())
 
 #%%
+fig, axes = plt.subplots(4, 3, figsize=(8, 8))
+for i in range(4):
+    for j in range(3):
+        ax = axes[i][j]
+        column = X.columns[i * 3 + j]
+        X[column].plot.hist(ax=ax)
+        ax.yaxis.label.set_visible(False)
+        ax.set_title(column.capitalize())
+        #ax.set_xlabel(column.capitalize())
+        
+fig.tight_layout()
+fig.savefig("featureViz12.pdf")
+
+#%%
 X["timerecurrence"].describe()
 
 #%%
-# for column in X.columns[2:16]:
-#     plt.scatter(X[column], y)
-#     plt.xlabel(column)
-#     plt.show()
+from yellowbrick.features.radviz import RadViz
 
-#%%
-from yellowbrick.features.radviz import RadViz 
+# Method 1: experiment with different ordering of the features on the circle
+# features = X.columns[:12]
+# np.random.shuffle(features.values)
+# display(features)
+# Method 2: go with an order you like
+features = ['lymphinfil', 'chemo', 'angioinv', 'diam', 'grade',
+       'hormonal', 'amputation', 'age', 'survival', 'histtype', 'posnodes',
+       'timerecurrence']
 
-features = X.columns[:13]
-visualizer = RadViz(classes=class_labels, features=features)
-
+fig, ax = plt.subplots(figsize=(6.3, 4))
+visualizer = RadViz(classes=class_labels, features=features, ax = ax)
 visualizer.fit(X[features], y)
-visualizer.transform(df[features])
+visualizer.transform(X[features])
+fig.tight_layout()
+ax.title.set_visible(False)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['bottom'].set_visible(False)
+ax.spines['left'].set_visible(False)
 visualizer.show()
+fig.savefig("radviz12features.pdf")
 
 #%%
 from yellowbrick.target import FeatureCorrelation
@@ -73,7 +112,7 @@ from yellowbrick.features import JointPlotVisualizer
 
 visualizer = JointPlotVisualizer()
 
-visualizer.fit_transform(X["grade"], y)        # Fit and transform the data
+visualizer.fit_transform(X["age"], y)        # Fit and transform the data
 visualizer.show()                     # Finalize and render the figure
 
 #%%
@@ -87,19 +126,23 @@ viz.show()               # Finalize and render the figure
 #%%
 from yellowbrick.features import Rank2D
 
-visualizer = Rank2D(algorithm='pearson')
+fig, ax = plt.subplots(figsize=(6, 5))
+visualizer = Rank2D(algorithm='pearson', ax=ax)
 
 visualizer.fit(df[np.append(features, ["eventdeath"])], y)           # Fit the data to the visualizer
 visualizer.transform(df[np.append(features, ["eventdeath"])])        # Transform the data
+fig.tight_layout()
+ax.title.set_visible(False)
 visualizer.show()              # Finalize and render the figure
+fig.savefig("pearsonRanking13.pdf")
 
 #%%
 from scipy.stats.stats import pearsonr
 p_values = X.apply(lambda col: pearsonr(col, y)[0])
-
-#%%
 treshold = 0.35
 features = p_values[(p_values > treshold) | (p_values < -treshold)].index.values
+
+#%%
 features = ["grade", "angioinv", "posnodes", "survival", "age", "diam"]
 features = ["grade", "angioinv", "posnodes"]
 #best 70 -> accuracy
@@ -119,7 +162,7 @@ features = ['AF067420', 'NM_001958', 'NM_000168', 'NM_001993', 'NM_006103',
        'Contig54325_RC', 'grade', 'NM_001102', 'NM_005010', 'NM_001124',
        'NM_021069', 'timerecurrence', 'AL137517', 'NM_000363',
        'Contig39226_RC', 'NM_005139', 'NM_005132']
-#features = X.columns[:13]
+features = X.columns[:12]
 #features = X.columns
 features
 
@@ -131,7 +174,7 @@ X_train.shape
 #%%
 # model training
 from sklearn.linear_model import LogisticRegression
-logreg = LogisticRegression()
+logreg = LogisticRegression(max_iter=1000)
 logreg.fit(X_train, y_train)
 logreg_pred = logreg.predict(X_test)
 
@@ -139,22 +182,51 @@ logreg_pred = logreg.predict(X_test)
 # compute accuracy score
 from sklearn.metrics import accuracy_score
 logreg_acc_score = accuracy_score(y_test, logreg_pred)
-print(logreg_acc_score)
+print("acc: ", logreg_acc_score * 100, "%")
 
 #%%
 from sklearn.metrics import f1_score
 logreg_f1_score = f1_score(y_test, logreg_pred)
-print(logreg_f1_score)
+print("f1:", logreg_f1_score)
+
+# %%
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
+
+pipeline = Pipeline([
+    ('scaler', Normalizer()),
+    ('logreg', LogisticRegression(max_iter=1000))
+    ],
+    verbose=True
+)
+pipeline.fit(X_train, y_train)
+logreg_pred = pipeline.predict(X_test)
+
+logreg_acc_score = accuracy_score(y_test, logreg_pred)
+print("acc: ", logreg_acc_score * 100, "%")
+logreg_f1_score = f1_score(y_test, logreg_pred)
+print("f1:", logreg_f1_score)
 
 #%%
-from yellowbrick.classifier import confusion_matrix
-confusion_matrix(logreg, X_train, y_train, X_test, y_test, classes=class_labels)
+from yellowbrick.classifier import ConfusionMatrix
+fig, ax = plt.subplots(figsize=(4, 3.2))
+cfm = ConfusionMatrix(logreg, classes=class_labels, ax=ax)
+cfm.fit(X_train, y_train)
+cfm.score(X_test, y_test)
+ax.tick_params(axis='x', rotation=0)
+fig.tight_layout()
+cfm.show()
+fig.savefig("confMatrix12.pdf")
 
 #%%
 from yellowbrick.model_selection import FeatureImportances
-viz = FeatureImportances(logreg, labels=X_train.columns, relative=False)
+fig, ax = plt.subplots(figsize=(6, 4))
+viz = FeatureImportances(logreg, labels=X_train.columns, relative=False, ax=ax)
 viz.fit(X, y)
-viz.show()
+ax.title.set_visible(False)
+fig.tight_layout()
+viz.show(outpath="featImpLog12.pdf")
 
 #%%
 fimp = pd.Series(viz.feature_importances_, index = viz.features_)
@@ -246,3 +318,13 @@ y_pred = rf.predict(X_test[important_features])
 
 score = f1_score(y_test, y_pred)
 print(score)
+
+# %%
+from yellowbrick.model_selection.rfecv import RFECV as ybRFECV
+fig, ax = plt.subplots(figsize=np.array([6.4, 4.8]) / 1.6) # default figsize = [6.4, 4.8]
+visualizer = ybRFECV(LogisticRegression(max_iter=1000), steps=4, ax=ax, scoring="accuracy")
+visualizer.fit(X[features], y)
+ax.title.set_visible(False)
+#fig.tight_layout()
+visualizer.show()
+fig.savefig("featSelLogAcc.pdf")
