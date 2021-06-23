@@ -218,12 +218,13 @@ print("f1:", logreg_f1_score)
 #%%
 from yellowbrick.classifier import ConfusionMatrix
 fig, ax = plt.subplots(figsize=(4, 3.2))
-cfm = ConfusionMatrix(logreg, classes=class_labels, ax=ax)
+cfm = ConfusionMatrix(LogisticRegression(max_iter=1000), classes=class_labels, ax=ax)
 cfm.fit(X_train, y_train)
 cfm.score(X_test, y_test)
+cfm.finalize()
+ax.title.set_visible(False)
 ax.tick_params(axis='x', rotation=0)
 fig.tight_layout()
-cfm.show()
 fig.savefig("confMatrix12.pdf")
 
 #%%
@@ -369,6 +370,6 @@ with open("featSelLogAcc.tex", "w") as f:
 table1 = pd.read_csv("featSelRfAcc.csv")
 table2 = pd.read_csv("featSelRfF1.csv")
 table1[table2.columns[0]]=table2.iloc[:,0]
-with open("featSelLogAcc.tex", "w") as f:
-    table1.to_latex(f, header=False, index=False, na_rep="")
+with open("featSelRf.tex", "w") as f:
+    table1.to_latex(f, index=False, na_rep="")
 
