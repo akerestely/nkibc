@@ -4,14 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-FONT_SIZE=12
-plt.rcParams.update({'font.size': FONT_SIZE})
-plt.rc('axes', titlesize=FONT_SIZE, labelsize=FONT_SIZE)
-plt.rc('xtick', labelsize=FONT_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=FONT_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=FONT_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=FONT_SIZE)  # fontsize of the figure title
+# FONT_SIZE=12
+# plt.rcParams.update({'font.size': FONT_SIZE})
+# plt.rc('axes', titlesize=FONT_SIZE, labelsize=FONT_SIZE)
+# plt.rc('xtick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=FONT_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=FONT_SIZE)    # legend fontsize
+# plt.rc('figure', titlesize=FONT_SIZE)  # fontsize of the figure title
 
+sns.set_context("notebook")
+sns.set_style("whitegrid")
 
 #%%
 df = pd.read_csv("data/deviramanan2016-nki-breast-cancer-data/NKI_cleaned.csv")
@@ -243,25 +245,39 @@ ranking = rfe.ranking_
 fimp = pd.Series(ranking, index = viz.features_)
 fimp.sort_values(ascending=True).head(20).index
 
+# %%
+def plot_rfecv(rfecv, out_path):
+    # Plot number of features VS. cross-validation scores
+    fig, ax = plt.subplots(figsize=np.array([6.4, 4.8]) / 1.3) # default figsize = [6.4, 4.8]
+    ax.set_xlabel("Number of Features Selected")
+    ax.set_ylabel("Score")
+    ax.plot(np.arange(1, rfecv.grid_scores_.shape[0] + 1), rfecv.grid_scores_)
+    if rfecv.grid_scores_.shape[0] < 30:
+        ax.scatter(np.arange(1, rfecv.grid_scores_.shape[0] + 1), rfecv.grid_scores_)
+    h = ax.axvline(rfecv.n_features_, color="k", linestyle="--", alpha=0.7)
+    ax.legend([h], [f"n_features = {rfecv.n_features_}\nscore = {rfecv.grid_scores_[rfecv.n_features_]:.2f}"], loc="lower center")
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.show()
+
+def save_features(rfecv, out_path):
+    pd.Series(features[rfecv.support_].sort_values(), name="Features").to_csv(out_path, index=False)
+
 #%%
 from sklearn.feature_selection import RFECV
+from sklearn.linear_model import LogisticRegression
+rfecvLogAcc = RFECV(estimator=LogisticRegression(max_iter=1000),
+ step=1, cv=3, n_jobs=-1, scoring='accuracy')
+rfecvLogAcc.fit(X[features], y)
+plot_rfecv(rfecvLogAcc, out_path="featSelLogAcc.pdf")
+save_features(rfecvLogAcc, "featSelLogAcc.csv")
 
-rfecv = RFECV(estimator=logreg, step=1, cv=2, n_jobs=-1, scoring='accuracy')
-rfecv.fit(X, y)
-
-print("Optimal number of features : %d" % rfecv.n_features_)
-
-# Plot number of features VS. cross-validation scores
-plt.figure()
-plt.xlabel("Number of features selected")
-plt.ylabel("Cross validation score (nb of correct classifications)")
-plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
-plt.show()
-
-#%%
-ranking = rfecv.ranking_
-fimp = pd.Series(ranking, index = features)
-fimp.sort_values(ascending=True).head(rfecv.n_features_).index
+# %%
+rfecvLogF1 = RFECV(estimator=LogisticRegression(max_iter=1000),
+ step=1, cv=3, n_jobs=-1, scoring='f1')
+rfecvLogF1.fit(X[features], y)
+plot_rfecv(rfecvLogF1, out_path="featSelLogF1.pdf")
+save_features(rfecvLogF1, "featSelLogF1.csv")
 
 #%%
 from sklearn.pipeline import Pipeline
@@ -295,22 +311,20 @@ score = f1_score(y_test, y_pred)
 print(score)
 
 #%%
-rfecv = RFECV(estimator=rf, step=1, cv=2, n_jobs=-1, scoring='f1')
-rfecv.fit(X, y)
+from sklearn.ensemble import RandomForestClassifier
+rfecvRfAcc = RFECV(estimator=RandomForestClassifier(),
+ step=1, cv=3, n_jobs=-1, scoring='accuracy')
+rfecvRfAcc.fit(X[features], y)
+plot_rfecv(rfecvRfAcc, out_path="featSelRfAcc.pdf")
+save_features(rfecvRfAcc, "featSelRfAcc.csv")
 
-print("Optimal number of features : %d" % rfecv.n_features_)
-
-# Plot number of features VS. cross-validation scores
-plt.figure()
-plt.xlabel("Number of features selected")
-plt.ylabel("Cross validation score (nb of correct classifications)")
-plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
-plt.show()
-
-ranking = rfecv.ranking_
-fimp = pd.Series(ranking, index = features)
-important_features = fimp.sort_values(ascending=True).head(rfecv.n_features_).index
-important_features
+# %%
+from sklearn.ensemble import RandomForestClassifier
+rfecvRfF1 = RFECV(estimator=RandomForestClassifier(),
+ step=1, cv=3, n_jobs=-1, scoring='f1')
+rfecvRfF1.fit(X[features], y)
+plot_rfecv(rfecvRfF1, out_path="featSelRfF1.pdf")
+save_features(rfecvRfF1, "featSelRfF1.csv")
 
 #%%
 rf.fit(X_train[important_features], y_train)
@@ -321,10 +335,20 @@ print(score)
 
 # %%
 from yellowbrick.model_selection.rfecv import RFECV as ybRFECV
-fig, ax = plt.subplots(figsize=np.array([6.4, 4.8]) / 1.6) # default figsize = [6.4, 4.8]
-visualizer = ybRFECV(LogisticRegression(max_iter=1000), steps=4, ax=ax, scoring="accuracy")
+fig, ax = plt.subplots(figsize=np.array([6.4, 4.8]) / 1.3) # default figsize = [6.4, 4.8]
+visualizer = ybRFECV(RandomForestClassifier(), ax=ax, scoring="accuracy")
 visualizer.fit(X[features], y)
 ax.title.set_visible(False)
-#fig.tight_layout()
 visualizer.show()
-fig.savefig("featSelLogAcc.pdf")
+fig.tight_layout()
+#fig.savefig("featSelRfAcc.pdf")
+
+# %%
+from yellowbrick.model_selection.rfecv import RFECV as ybRFECV
+fig, ax = plt.subplots(figsize=np.array([6.4, 4.8]) / 1.3) # default figsize = [6.4, 4.8]
+visualizer = ybRFECV(RandomForestClassifier(), ax=ax, scoring="f1")
+visualizer.fit(X[features], y)
+ax.title.set_visible(False)
+visualizer.show()
+fig.tight_layout()
+#fig.savefig("featSelRfF1.pdf")
