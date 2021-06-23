@@ -357,3 +357,18 @@ ax.title.set_visible(False)
 visualizer.show()
 fig.tight_layout()
 #fig.savefig("featSelRfF1.pdf")
+
+###################################################################
+# %%
+table = pd.read_csv("featSelLogAcc.csv")
+table = pd.DataFrame(table.values.reshape((8, -1), order="F"))
+with open("featSelLogAcc.tex", "w") as f:
+    table.to_latex(f, header=False, index=False)
+
+# %%
+table1 = pd.read_csv("featSelRfAcc.csv")
+table2 = pd.read_csv("featSelRfF1.csv")
+table1[table2.columns[0]]=table2.iloc[:,0]
+with open("featSelLogAcc.tex", "w") as f:
+    table1.to_latex(f, header=False, index=False, na_rep="")
+
