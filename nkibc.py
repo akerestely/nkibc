@@ -192,6 +192,11 @@ logreg_f1_score = f1_score(y_test, logreg_pred)
 print("f1:", logreg_f1_score)
 
 # %%
+from sklearn.model_selection import cross_val_score
+cross_val_score(LogisticRegression(max_iter=1000),
+ X[features], y, scoring="accuracy", cv=3, n_jobs=1)
+
+# %%
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import Normalizer
